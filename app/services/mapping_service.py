@@ -45,12 +45,15 @@ class MappingService:
                                bullets="-",
                                strip=['script', 'style'])
             
-            # Создаем маппинг
+            # Создаем маппинг с оригинальным markdown
             self._create_mapping(soup, markdown_result)
+            
+            # Добавляем нумерацию строк только в итоговый результат
+            numbered_markdown = self._add_line_numbers(markdown_result)
             
             return {
                 "original_html_length": len(html_text),
-                "markdown_result": markdown_result.strip(),
+                "markdown_result": numbered_markdown.strip(),
                 "html_with_ids": str(soup),
                 "mappings": [self._mapping_to_dict(m) for m in self.mappings],
                 "status": "converted"
@@ -65,9 +68,20 @@ class MappingService:
                 "error": str(e)
             }
     
+    def _add_line_numbers(self, markdown_text: str) -> str:
+        """Добавляет номера строк в формате [xxx] к каждой строке markdown"""
+        lines = markdown_text.split('\n')
+        numbered_lines = []
+        
+        for i, line in enumerate(lines, 1):
+            line_number = f"[{i:03d}]"
+            numbered_lines.append(f"{line_number} {line}")
+        
+        return '\n'.join(numbered_lines)
+    
     def _add_unique_ids(self, soup: BeautifulSoup) -> None:
-        """Добавляет уникальные ID ко всем HTML элементам"""
-        for element in soup.find_all(True):  # Находим все теги
+        """Добавляет уникальные ID только к HTML элементам первого уровня"""
+        for element in soup.children:  # Находим только элементы первого уровня
             if isinstance(element, Tag):
                 element['data-mapping-id'] = str(uuid.uuid4())
     
@@ -77,8 +91,8 @@ class MappingService:
         markdown_lines = markdown_text.split('\n')
         current_line = 0
         
-        # Обходим элементы в порядке их появления
-        for element in soup.find_all(True):
+        # Обходим только элементы первого уровня в порядке их появления
+        for element in soup.children:
             if isinstance(element, Tag) and element.get('data-mapping-id'):
                 # Конвертируем отдельный элемент в markdown
                 element_markdown = md(str(element), 
